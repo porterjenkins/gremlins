@@ -2,9 +2,22 @@ source("prjCtrl.r")
 source("mcmcUtils.R")
 
 main = function(){
+    
+  if(genData){
+    print("Generating synthetic data...")
+  }
+  
+  # Hyper parameters
+  prior = setHRLPrior(COV,demoCOV)
+  if(saveRData){
+    save(prior,file=priorFile)
+  }
+  
+  # Set Parameters
+  paramSS = NULL
+  param = setHRLParams()
+  
 
-  print("Test Main Function")
-  print(prjCtrl)
   
 }
 
@@ -13,3 +26,4 @@ main = function(){
 
 ## Execute main MCMC routine
 main()
+

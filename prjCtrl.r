@@ -1,130 +1,88 @@
-
-######################################################################
-# Create the project control  class
-projectControl <- setClass(
-  # Set the name for the class
-  "Project Control",
-  
-  # Define the slots
-  slots = c(
-    
-    projectName = 'character',
-    inputFile = 'character',
-    runDelta = 'logical',
-    
-    nBurnin = "numeric",
-    nSample = "numeric",
-    useTrueParam = "logical",
-    randomStart = "logical",
-    genData = 'logical',
-    plotDetail = 'logical',
-    delayToPrint = 'logical',
-    newSeed = 'logical',
-    includeIntercept = 'logical',
-    
-    debug = 'logical',
-    detailThin = 'numeric',
-    printToScreenThing = 'numeric',
-    printFigures = 'logical',
-    
-    PROD = 'numeric',
-    IND = 'numeric',
-    COV = 'numeric',
-    demoCOV = 'numeric',
-    maxRep = 'numeric',
-    minRep = 'numeric',
-    ridgeRegression = 'numeric',
-    fullCovar = 'logical',
-    saveIndividualDraws = 'logical',
-    useConstraints = 'logical',
-    
-    inputDemographicFile = 'character',
-    useExistingIndSlope = 'logical',
-    indSlopeFile = 'character',
-    detailFile = 'character',
-    tauFile = 'character',
-    loglikeFile = 'character',
-    reportFile = 'character',
-    paramFile = 'character',
-    paramPostMeanFile = 'character',
-    paramSSFile = 'character',
-    trueParamFileTxt = 'character',
-    priorFile = 'character',
-    nParamFile = 'character',
-    indResultsFile = 'character',
-    paramConstraintsFile = 'character',
-    deltaDetail = 'character',
-    
-    startBurnin = 'numeric',
-    startSample = 'numeric',
-    rwParamProb = 'vector',
-    rwParamSig = 'vector',
-    rwParamProbDelta = 'vector',
-    rwParamSigDelta = 'vector'
-    
-  
-    
-  ),
-  
-  prototype = list(
-    projectName = "NULL?]"
-  )
-  
-
-  
-)
+# Project control file for MCMC routine
+# Variables below specify important MCMC meta parameters including: File I/O, Sample Size, Burn-in, model type, etc...
 
 
-setMethod("initialize","ANY",function(.Object,projectName){
-  .Object@projectName = projectName
-  return(.Object)
+projectName = 'tmp_r_debug_'
+
+runDelta = TRUE
   
-})
+  
+nBurnin = 1000
+nSample = 1000
+useTrueParam = TRUE
+randomStart = TRUE
+genData = TRUE
+plotDetail = TRUE
+delayToPrint = FALSE
+newSeed = TRUE
+includeIntercept = FALSE
+  
+debug = TRUE
+detailThin = 10
+printToScreenThing = 10
+printFigures = TRUE
+  
+PROD = 5
+IND = 100
+COV = 8
+demoCOV = 10
+maxRep = 100
+minRep = 100
+ridgeRegression = .1
+fullCovar = FALSE
+saveIndividualDraws = TRUE
+useConstraints = FALSE
+useExistingIndSlope = FALSE
+saveRData = FALSE
 
 
+inputFile = 'tmp_debug.txt'
 
-prjCtrl = projectControl()
+if(runDelta)
+  {
+  # Delta I/O
+  inputDemographicFile = paste(projectName,"tmp_demo.csv",sep = "")
+  deltaDetail = paste(projectName,"deltaDetailFile.txt",sep = "")
+  
+  # Delta proposal random walk
+  rwParamProbDelta = c(.25,.5,25)
+  rwParamRwSigDelta = c(.1,.65,1.15)
+  
+  # Delta acceptance init
+  deltaARate = matrix(0,3,2)
+  
+}
 
+indSlopeFile = paste(projectName,"indSlopeFile.csv",sep = "")
+detailFile = paste(projectName,"HRLdetail.txt",sep = "")
+logLikeFile = paste(projectName,"HRLLogLike.txt",sep = "")
+reportFile = paste(projectName,"HRLreport.txt",sep = "")
+paramFile = paste(projectName,"tmp_demo.RData",sep = "") # Save as R Data object
+paramPostMeanFile = paste(projectName,"HRLparamPostMean.RData",sep = "") # Save as R Data object
+paramSSFile = paste(projectName,"HRLparamSS.RData",sep = "") # Save as R data object
+trueParamFile = paste(projectName,"HRLTrueParam.RData",sep = "")
+trueParamFileTxt = paste(projectName,"HRLTrueParam.txt",sep = "")
+priorFile = paste(projectName,"HRLPrior.RData",sep = "")
+nParamFile = paste(projectName,"nParam.txt",sep = "")
+indResultsFile = paste(projectName,"IndResults.txt",sep = "")
 
-# Set the default values for the slots. (optional)
-tmp=list(
-  projectName = 'tmp_r_debug_',
-  inputFile = 'tmp_debug.txt',
-  runDelta = TRUE,
-  
-  
-  nBurnin = 1000,
-  nSample = 1000,
-  useTrueParam = TRUE,
-  randomStart = TRUE,
-  genData = TRUE,
-  plotDetail = TRUE,
-  delayToPrint = FALSE,
-  newSeed = TRUE,
-  includeIntercept = FALSE,
-  
-  debug = TRUE,
-  detailThin = 10,
-  printToScreenThing = 10,
-  printFigures = TRUE,
-  
-  PROD = 5,
-  IND = 100,
-  COV = 8,
-  demoCOV = 10,
-  maxRep = 100,
-  minRep = 100,
-  ridgeRegression = .1,
-  fullCovar = FALSE,
-  saveIndividualDraws = TRUE,
-  useConstraints = FALSE,
-  
-  inputDemographicFile = paste(projectName,"tmp_demo")
-  
-  
-  
-  
-)
+if(useConstraints)
+{
+  paramConstraintsFile = paste(projectName,"ParamConstraints.txt",sep = "")
+}
+
+startBurnin = 1000
+startSample = 1000
+
+rwParamProb = c(.55,.25,.1)
+rwParamRwSig = c(.1,.65,1.15)
+aRate =  matrix(0,3,2)
+nS = 2 # Number of mixture components
+probKMeansProposal = 0
+probDecayKMeansProposal = .9
+probGenS = .5
+probGenSig2 = .5
+
 
 
 
