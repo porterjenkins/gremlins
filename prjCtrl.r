@@ -1,87 +1,89 @@
 # Project control file for MCMC routine
-# Variables below specify important MCMC meta parameters including: File I/O, Sample Size, Burn-in, model type, etc...
+# Create list called prjCtrl that specifies important MCMC meta parameters including: File I/O, Sample Size, Burn-in, model type, etc...
 
+prjCtrl = list(
 
-projectName = 'tmp_r_debug_'
-
-runDelta = TRUE
+  projectName = 'tmp_r_debug_',
   
+  runDelta = TRUE,
+    
+    
+  nBurnin = 1000,
+  nSample = 1000,
+  useTrueParam = TRUE,
+  randomStart = TRUE,
+  genData = TRUE,
+  plotDetail = TRUE,
+  delayToPrint = FALSE,
+  newSeed = TRUE,
+  includeIntercept = FALSE,
+    
+  debug = TRUE,
+  detailThin = 10,
+  printToScreenThing = 10,
+  printFigures = TRUE,
+    
+  PROD = 5,
+  IND = 100,
+  COV = 8,
+  demoCOV = 10,
+  maxRep = 100,
+  minRep = 100,
+  ridgeRegression = .1,
+  fullCovar = FALSE,
+  saveIndividualDraws = TRUE,
+  useConstraints = TRUE,
+  useExistingIndSlope = FALSE,
+  saveRData = FALSE,
   
-nBurnin = 1000
-nSample = 1000
-useTrueParam = TRUE
-randomStart = TRUE
-genData = TRUE
-plotDetail = TRUE
-delayToPrint = FALSE
-newSeed = TRUE
-includeIntercept = FALSE
+  startBurnin = 1000,
+  startSample = 1000,
   
-debug = TRUE
-detailThin = 10
-printToScreenThing = 10
-printFigures = TRUE
-  
-PROD = 5
-IND = 100
-COV = 8
-demoCOV = 10
-maxRep = 100
-minRep = 100
-ridgeRegression = .1
-fullCovar = FALSE
-saveIndividualDraws = TRUE
-useConstraints = FALSE
-useExistingIndSlope = FALSE
-saveRData = FALSE
+  rwParamProb = c(.55,.25,.1),
+  rwParamRwSig = c(.1,.65,1.15),
+  aRate =  matrix(0,3,2),
+  nS = 2, # Number of mixture components
+  probKMeansProposal = 0,
+  probDecayKMeansProposal = .9,
+  probGenS = .5,
+  probGenSig2 = .5,
 
+  inputFile = 'tmp_debug.txt'
 
-inputFile = 'tmp_debug.txt'
+)
 
-if(runDelta)
+if(prjCtrl$runDelta)
   {
   # Delta I/O
-  inputDemographicFile = paste(projectName,"tmp_demo.csv",sep = "")
-  deltaDetail = paste(projectName,"deltaDetailFile.txt",sep = "")
+  prjCtrl[["inputDemographicFile"]] = paste(prjCtrl$projectName,"tmp_demo.csv",sep = "")
+  prjCtrl[["deltaDetail"]] = paste(prjCtrl$projectName,"deltaDetailFile.txt",sep = "")
   
   # Delta proposal random walk
-  rwParamProbDelta = c(.25,.5,25)
-  rwParamRwSigDelta = c(.1,.65,1.15)
+  prjCtrl[["rwParamProbDelta"]] = c(.25,.5,25)
+  prjCtrl[["rwParamRwSigDelta"]] = c(.1,.65,1.15)
   
   # Delta acceptance init
-  deltaARate = matrix(0,3,2)
+  prjCtrl[["deltaARate"]] = matrix(0,3,2)
   
 }
 
-indSlopeFile = paste(projectName,"indSlopeFile.csv",sep = "")
-detailFile = paste(projectName,"HRLdetail.txt",sep = "")
-logLikeFile = paste(projectName,"HRLLogLike.txt",sep = "")
-reportFile = paste(projectName,"HRLreport.txt",sep = "")
-paramFile = paste(projectName,"tmp_demo.RData",sep = "") # Save as R Data object
-paramPostMeanFile = paste(projectName,"HRLparamPostMean.RData",sep = "") # Save as R Data object
-paramSSFile = paste(projectName,"HRLparamSS.RData",sep = "") # Save as R data object
-trueParamFile = paste(projectName,"HRLTrueParam.RData",sep = "")
-trueParamFileTxt = paste(projectName,"HRLTrueParam.txt",sep = "")
-priorFile = paste(projectName,"HRLPrior.RData",sep = "")
-nParamFile = paste(projectName,"nParam.txt",sep = "")
-indResultsFile = paste(projectName,"IndResults.txt",sep = "")
+prjCtrl[["indSlopeFile"]] = paste(prjCtrl$projectName,"indSlopeFile.csv",sep = "")
+prjCtrl[["detailFile"]] = paste(prjCtrl$projectName,"HRLdetail.txt",sep = "")
+prjCtrl[["logLikeFile"]] = paste(prjCtrl$projectName,"HRLLogLike.txt",sep = "")
+prjCtrl[["reportFile"]] = paste(prjCtrl$projectName,"HRLreport.txt",sep = "")
+prjCtrl[["paramFile"]] = paste(prjCtrl$projectName,"tmp_demo.RData",sep = "") # Save as R Data object
+prjCtrl[["paramPostMeanFile"]] = paste(prjCtrl$projectName,"HRLparamPostMean.RData",sep = "") # Save as R Data object
+prjCtrl[["paramSSFile"]] = paste(prjCtrl$projectName,"HRLparamSS.RData",sep = "") # Save as R data object
+prjCtrl[["trueParamFile"]] = paste(prjCtrl$projectName,"HRLTrueParam.RData",sep = "")
+prjCtrl[["trueParamFileTxt"]] = paste(prjCtrl$projectName,"HRLTrueParam.txt",sep = "")
+prjCtrl[["priorFile"]] = paste(prjCtrl$projectName,"HRLPrior.RData",sep = "")
+prjCtrl[["nParamFile"]] = paste(prjCtrl$projectName,"nParam.txt",sep = "")
+prjCtrl[["indResultsFile"]] = paste(prjCtrl$projectName,"IndResults.txt",sep = "")
 
-if(useConstraints)
+if(prjCtrl$useConstraints)
 {
-  paramConstraintsFile = paste(projectName,"ParamConstraints.txt",sep = "")
+  prjCtrl[["paramConstraintsFile"]] = paste(prjCtrl$projectName,"ParamConstraints.txt",sep = "")
 }
-
-startBurnin = 1000
-startSample = 1000
-
-rwParamProb = c(.55,.25,.1)
-rwParamRwSig = c(.1,.65,1.15)
-aRate =  matrix(0,3,2)
-nS = 2 # Number of mixture components
-probKMeansProposal = 0
-probDecayKMeansProposal = .9
-probGenS = .5
-probGenSig2 = .5
 
 
 
