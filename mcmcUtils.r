@@ -1,5 +1,4 @@
-#source("prjCtrl.R")
-
+library(mvtnorm)
 
 ##### "Roll" Loaded Die #####
 
@@ -16,6 +15,21 @@ loadedDie = function(prob){
   
   return(state)
 }
+
+##### Slice up function #####
+
+sliceUp = function(xc,mu,sig2,lb){
+  u1 = runif(1)
+  sqrtPart = sqrt((xc-mu)^2 - 2*sig2*log(u1))
+  ub = mu + sqrtPart
+  lb = max(mu - sqrtPart, lb)
+  
+  u2 = runif(1)
+  x  = lb + (ub-lb)*u2
+  return(x)  
+}
+
+
 
 ##### Initialize Prior Data Structure #####
 setHRLPrior = function(COV,demoCOV){
@@ -130,12 +144,12 @@ genHRLParams = function(prjCtrl,param,dataZ,prior){
   deltaTrue = array(0,dim=c(prjCtrl$demoCOV,1))
   
 
-  deltaStart = c(-3, .09, 1,-2, .1, -2.5, .5)
+  deltaStart = c(-3, .09, 1,-2, .1, -2.5, .5,2.1,-1.2,.01)
   slopeBarStart = c(-1,2,.5,8,-5,2.2,5)
   slopeCovStart = c(9,3,4,5,3,1,18)
   
   slopeBarK = 7
-  deltaK = 7
+  deltaK = 10
   
   k = 0
   for(j in 1:prjCtrl$COV){
@@ -156,6 +170,9 @@ genHRLParams = function(prjCtrl,param,dataZ,prior){
     deltaTrue[j,1] = deltaStart[k]
   }
   
+  SSE = array(0,dim=c(prjCtrl$COV,prjCtrl$COV,prjCtrl$nS))
+  slopeCorrMLE = array(0,dim=c(prjCtrl$COV,prjCtrl$COV,prjCtrl$nS))
+  
   
   
   ## TODO: Consider case where nS > 2. Then segment probability regression shouldb be multinomial. Should delta be a matrix (n_covariates x n_segments)
@@ -169,9 +186,10 @@ genHRLParams = function(prjCtrl,param,dataZ,prior){
       
   #  }  
   #}
+
   
   # Generate true individual state classifications from generated deltas
-  
+
   sTrue = array(0,c(prjCtrl$IND,1))
   pTrue = array(1,c(prjCtrl$nS,1))*(1/prjCtrl$nS)
   nSTrue = array(0,c(prjCtrl$nS,1))
@@ -201,17 +219,78 @@ genHRLParams = function(prjCtrl,param,dataZ,prior){
     nSTrue[i,1] = length(sTrue[sTrue == i])
   }
   
-  print(nSTrue)
+  if(prjCtrl$useConstraints){
+    atLeastOneNot0 = FALSE
+    while(atLeastOneNot0 == FALSE){
+      for(j in 1:prjCtrl$COV){
+        if(runif(1) < .2){
+          if(runif(1) < .5){
+            param$slopeConstraintFlag[j,1] = 1
+            atLeastOneNot0 = TRUE
+          }
+          else{
+            param$slopeConstraintFlag[j,1] = -1
+            atLeastOneNot0 = TRUE
+          }
+        }
+      }
+    }
+    zer0 = 0
+    for(i in 1:prjCtrl$IND){
+      #slopTrue: (COV x 1 x IND) - vector of column vectors
+      slopeTrue[,1,i] = t(rmvnorm(n=1,mean=slopeBarTrue,sigma=slopeCovTrue))
+      for(j in 1:prjCtrl$COV){
+        if(param$slopeConstraintFlag[j] != 0){
+          if(param$slopeConstraintFlag[j] == 1){
+            if(slopeTrue[j,1,i] < 0){
+              slopeTrue[j,1,i] = 1
+              for(t in 1:25){
+                # Slice up
+                slopeTrue[j,1,i] = sliceUp(slopeTrue[j,1,i],slopeBarTrue[j],1,zer0)
+              }
+            }
+          }
+        }
+        else{
+          if(slopeTrue[j,1,i] > 0){
+            slopeTrue[j,1,i] = -1
+            for(t in 1:25){
+              # Slice up
+              slopeTrue[j,1,i] = sliceUp(slopeTrue[j,1,i],slopeBarTrue[j],1,zer0)
+            }
+          }
+        }
+      }
+      SSE[,,sTrue[i]] = SSE[,,sTrue[i]] + (slopeTrue[,,i] - slopeBarTrue) %*% t((slopeTrue[,,i] - slopeBarTrue))
+    }
+  }
+  else{
+    # No constraints on beta bar
+    for(i in 1:prjCtrl$IND){
+      slopeTrue[,1,i] = t(rmvnorm(n=1,mean=slopeBarTrue,sigma=slopeCovTrue))
+      SSE[,,sTrue[i]] = SSE[,,sTrue[i]] + (slopeTrue[,,i] - slopeBarTrue) %*% t((slopeTrue[,,i] - slopeBarTrue))
+    }
+  }
+  
+  for(i in 1:prjCtrl$nS){
+    SSE[,,i] = SSE[,,i] / nSTrue[i,1] 
+    tMLE = diag(1 / sqrt(diag(SSE[,,i])))
+    slopeCorrMLE[,,i] = tMLE%*%SSE[,,i]%*%tMLE
+  }
   
   
+  param$slope = slopeTrue
   param$slopeBar = slopeBarTrue
+  param$slopeCov = slopeCovTrue
+  param$sig2 = sig2True
+  
   param$delta = deltaTrue
-  param4slopCov = slopeCovTrue
   
+  param$nS = nSTrue
+  param$p = pTrue
+  param$s = sTrue
   
-  
-  
-  
+
   return(param)
 }
 
