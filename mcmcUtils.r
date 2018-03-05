@@ -296,8 +296,8 @@ genHRLData = function(prjCtrl,param,dataZ){
     
     y = array(0,dim=c(prjCtrl$nRep,1,prjCtrl$IND)),
     # X tensor dimensions: (num products x num covariates x num task repitions x n respondents)
-    X = array(0,dim=c(prjCtrl$PROD,prjCtrl$COV,prjCtrl$nRep,prjCtrl$IND))
-    #Z = array(0,dim=c(prjCtrl$IND,prjCtrl$demoCOV))
+    X = array(0,dim=c(prjCtrl$PROD,prjCtrl$COV,prjCtrl$nRep,prjCtrl$IND)),
+    TNREP = prjCtrl$IND * prjCtrl$nRep
     
   )
   
@@ -344,6 +344,29 @@ genHRLData = function(prjCtrl,param,dataZ){
   
   
   return(data)
+}
+
+
+mleHRLStart = function(prjCtrl,data,param,prior){
+  
+  tSlopeBar = array(0,dim=c(prjCtrl$COV,1))
+  ssTSlopeBar = tSlopeBar
+  tData = list(
+    Y = array(0,dim=c(data$TNREP,1)),
+    X = array(0,dim=c(data$TNREP,prjCtrl$COV,prjCtrl$PROD))
+    
+  )
+  
+  tStart = 1
+  tEnd = prjCtrl$nRep
+  
+  for(i in 1:prjCtrl$IND){
+    tData$Y[tStart:tEnd,1] = data$y[,,i]
+  }
+  
+  
+  
+  return(param)
 }
 
 

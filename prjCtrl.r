@@ -33,7 +33,7 @@ prjCtrl = list(
   saveIndividualDraws = TRUE,
   useConstraints = TRUE,
   useExistingIndSlope = FALSE,
-  saveRData = FALSE,
+  saveRData = TRUE,
   
   startBurnin = 1000,
   startSample = 1000,
@@ -47,7 +47,8 @@ prjCtrl = list(
   probGenS = .5,
   probGenSig2 = .5,
 
-  inputFile = 'tmp_debug.txt'
+  inputFile = 'data.Rdata'
+
 
 )
 
