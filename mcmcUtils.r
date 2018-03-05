@@ -140,16 +140,16 @@ genHRLParams = function(prjCtrl,param,dataZ,prior){
   }
   
   #deltaTrue = t(rmvnorm(n=prjCtrl$nS,mean=rep(0,prjCtrl$demoCOV),sigma=.5*diag(prjCtrl$demoCOV)))
-  #deltaTrue = array(0,dim=c(prjCtrl$demoCOV,prjCtrl$nS))
-  deltaTrue = array(0,dim=c(prjCtrl$demoCOV,1))
+  deltaTrue = array(0,dim=c(prjCtrl$demoCOV,prjCtrl$nS))
+  #deltaTrue = array(0,dim=c(prjCtrl$demoCOV,1))
   
 
-  deltaStart = c(-3, .09, 1,-2, .1, -2.5, .5,2.1,-1.2,.01)
+  deltaStart = c(-3, .09, 1,-2, .1, -2.5, .5,2.1,-1.2,.01,2.2,.75,-.8,-1.9,0,3.6)
   slopeBarStart = c(-1,2,.5,8,-5,2.2,5)
   slopeCovStart = c(9,3,4,5,3,1,18)
   
   slopeBarK = 7
-  deltaK = 10
+  deltaK = length(deltaStart)
   
   k = 0
   for(j in 1:prjCtrl$COV){
@@ -161,31 +161,27 @@ genHRLParams = function(prjCtrl,param,dataZ,prior){
     slopeCovTrue[j,j] = slopeCovStart[k]
   }
   
-  k = 0
-  for(j in 1:prjCtrl$demoCOV){
-    k = k + 1
-    if(k>deltaK){
-      k=1
-    }
-    deltaTrue[j,1] = deltaStart[k]
+
+  for(j in 2:prjCtrl$nS){
+    for(i in 1:prjCtrl$demoCOV){
+
+        k = k+1
+        if(k>deltaK){
+          k=1
+        }
+        
+        deltaTrue[i,j] = deltaStart[k]
+      
+    }  
   }
+  
+  
   
   SSE = array(0,dim=c(prjCtrl$COV,prjCtrl$COV,prjCtrl$nS))
   slopeCorrMLE = array(0,dim=c(prjCtrl$COV,prjCtrl$COV,prjCtrl$nS))
   
   
   
-  ## TODO: Consider case where nS > 2. Then segment probability regression shouldb be multinomial. Should delta be a matrix (n_covariates x n_segments)
-  #for(j in 1:prjCtrl$nS){
-  #  for(i in 1:prjCtrl$demoCOV){
-  #    k = k+1
-  #    if(k>deltaK){
-  #      k=1
-  #    }
-  #    deltaTrue[i,j] = deltaStart[k]
-      
-  #  }  
-  #}
 
   
   # Generate true individual state classifications from generated deltas
@@ -198,9 +194,8 @@ genHRLParams = function(prjCtrl,param,dataZ,prior){
     for(i in 1:prjCtrl$IND){
       
       eta = dataZ[i,] %*% deltaTrue
-      sProbs = exp(eta) / (1 + exp(eta))
-      pTrue[1] = sProbs
-      pTrue[2] = 1 - sProbs
+      sProbs = exp(eta) / sum(exp(eta))
+      pTrue = t(sProbs)
       sTrue[i,1] = loadedDie(pTrue)
       
     }
@@ -292,6 +287,63 @@ genHRLParams = function(prjCtrl,param,dataZ,prior){
   
 
   return(param)
+}
+
+
+genHRLData = function(prjCtrl,param,dataZ){
+  print("Generating synthetic data...")
+  data = list(
+    
+    y = array(0,dim=c(prjCtrl$nRep,1,prjCtrl$IND)),
+    # X tensor dimensions: (num products x num covariates x num task repitions x n respondents)
+    X = array(0,dim=c(prjCtrl$PROD,prjCtrl$COV,prjCtrl$nRep,prjCtrl$IND))
+    #Z = array(0,dim=c(prjCtrl$IND,prjCtrl$demoCOV))
+    
+  )
+  
+  # Beta covariance for data generation - diagonal covariance only
+  cov_X = diag(prjCtrl$COV)
+  cov_x_start = c(2,1,3,1,2,1,2)
+  cov_x_k = 7
+  k = 0
+  for(j in 1:prjCtrl$COV){
+    k = k + 1
+    if(k > cov_x_k){
+      k = 1
+    }
+    cov_X[j,j] = cov_x_start[k]
+    
+  }
+  
+  
+  
+  for(i in 1:prjCtrl$IND){
+  
+    for(j in 1:prjCtrl$nRep){
+      tProb = array(0,c(prjCtrl$PROD,1))
+      if(prjCtrl$includeIntercept){
+        data$X[,1,j,i] = 1
+        data$X[,2:prjCtrl$COV,j,i] = rmvnorm(n=prjCtrl$PROD,mean = rep(0,(prjCtrl$COV-1)),sigma = cov_X[2:prjCtrl$COV,2:prjCtrl$COV])
+      }else{
+        # No intercept
+        data$X[,,j,i] = rmvnorm(n=prjCtrl$PROD,mean = rep(0,prjCtrl$COV),sigma = cov_X)
+      }
+      
+      tProb = (1/param$sig2[param$s[i]])*data$X[,,j,i]%*%param$slope[,1,i]
+      maxProb = max(tProb)
+      tProb = exp(tProb - maxProb)
+      tProb = tProb / sum(tProb)
+      data$y[j,1,i] = loadedDie(tProb)
+  
+    }
+  }
+  
+  if(is.null(dataZ) == FALSE){
+    data[['Z']] = dataZ
+  }
+  
+  
+  return(data)
 }
 
 

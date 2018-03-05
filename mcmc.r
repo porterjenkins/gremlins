@@ -6,8 +6,6 @@ source("mcmcUtils.R")
 main = function(){
     
   if(prjCtrl$genData){
-    print("Generating synthetic data...")
-  }
   
   # Hyper parameters
   prior = setHRLPrior(COV=prjCtrl$COV,demoCOV=prjCtrl$demoCOV)
@@ -29,20 +27,31 @@ main = function(){
                       mean = rep(0,prjCtrl$demoCOV),
                       sigma = diag(prjCtrl$demoCOV))
     }
+    else{
+      dataZ = NULL
+    }
 
     param = genHRLParams(prjCtrl = prjCtrl,
                         param = param,
                         dataZ = dataZ,
                         prior = prior)
-    tmp = 0
+    if(prjCtrl$useConstraints){
+      paramSS$slopeConstraintFlag = param$slopeConstraintFlag
+      write.table(param$slopeConstraintFlag,file=prjCtrl$paramConstraintsFile,col.names = FALSE,row.names=FALSE)
+    }
+    for(i in 1:prjCtrl$IND){
+      param$slopeOverSig2[,,i] = (1/param$sig2[param$s[i]])*param$slope[,,i]
+    }
+    save(param,file=prjCtrl$trueParamFile)
+    
   }
   else{
     # Don't use true parameter values
-    
-    
+    load(prjCtrl$trueParamFile)
   }
   
-  
+  data = genHRLData(prjCtrl,param,dataZ)
+  }  
 }
 
 
