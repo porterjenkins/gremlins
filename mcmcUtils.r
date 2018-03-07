@@ -56,7 +56,7 @@ setHRLPrior = function(COV,demoCOV){
     sig2Scale = 1,
     sig2Shape = 1,
     sig2GammaScale = 100,
-    sig2GammeShape = 5
+    sig2GammaShape = 5
   
   )
   
@@ -346,14 +346,80 @@ genHRLData = function(prjCtrl,param,dataZ){
   return(data)
 }
 
+##### Compute log likelihood of multinomial logit #####
 
+mnlLogLike = function(Y,X,beta,NREP,prjCtrl){
+  probs = array(0,dim=c(NREP,prjCtrl$PROD))
+  
+  for(j in 1:prjCtrl$PROD){
+    probs[,j] = X[,,j] %*% beta
+  }
+  maxProb = array(0,dim=c(NREP,1))
+  
+  for(n in 1:NREP){
+    maxProb[n,1] = max(probs[n,])
+  }
+  
+  for(j in 1:prjCtrl$PROD){
+    probs[,j] = probs[,j] - maxProb
+  }
+  
+  log_like = 0
+  for(n in 1:NREP){
+    for(j in 1:prjCtrl$PROD){
+      y_ij_idx = Y[n]
+      if(y_ij_idx == j){
+        y = 1
+      }else{
+        y = 0
+      }
+    
+      log_like_icj = y*(probs[n,j] - log(sum(exp(probs[n,]))))
+      log_like = log_like + log_like_icj
+    }
+  }
+  
+  
+  return(log_like)
+}
+
+
+##### Generate updated beta bar #####
+genAggLogit = function(data,prjCtrl,slope,slopeBar,slopeCov){
+  jump_size_index = loadedDie(prjCtrl$rwParamProb)
+  rw_sig = prjCtrl$rwParamRwSig[jump_size_index]
+  p_slope = t(rmvnorm(n=1,mean=slope,sigma = rw_sig*diag(prjCtrl$COV)))
+  
+  cLL = mnlLogLike(data$Y,data$X,slope,data$TNREP,prjCtrl)
+  pLL = mnlLogLike(data$Y,data$X,p_slope,data$TNREP,prjCtrl)
+  
+  cPrior = -0.5*t(slope-slopeBar)%*%solve(slopeCov)%*%(slope-slopeBar)
+  pPrior = -0.5*t(slope-slopeBar)%*%solve(slopeCov)%*%(slope-slopeBar)
+  
+  lap = pLL + pPrior - cLL - cPrior
+  
+  a_rate = prjCtrl$aRate
+  if(log(runif(1) < lap)){
+    slope = p_slope
+    a_rate[jump_size_index,1] = a_rate[jump_size_index,1] + 1
+    
+  }
+  
+  a_rate[jump_size_index,2] = a_rate[jump_size_index,2] + 1
+  return(list(slope,a_rate))
+}
+
+
+
+##### Get starting values using MLE routine #####
 mleHRLStart = function(prjCtrl,data,param,prior){
   
   tSlopeBar = array(0,dim=c(prjCtrl$COV,1))
   ssTSlopeBar = tSlopeBar
   tData = list(
     Y = array(0,dim=c(data$TNREP,1)),
-    X = array(0,dim=c(data$TNREP,prjCtrl$COV,prjCtrl$PROD))
+    X = array(0,dim=c(data$TNREP,prjCtrl$COV,prjCtrl$PROD)),
+    TNREP = data$TNREP
     
   )
   
@@ -362,13 +428,81 @@ mleHRLStart = function(prjCtrl,data,param,prior){
   
   for(i in 1:prjCtrl$IND){
     tData$Y[tStart:tEnd,1] = data$y[,,i]
+    for(j in 1:prjCtrl$PROD){
+      tData$X[tStart:tEnd,,j] = t(data$X[j,,,i])
+    }
+    tStart = tEnd + 1
+    if(i < prjCtrl$IND){
+      tEnd = tStart + prjCtrl$nRep - 1
+    }
   }
+  
+  slopeBarBar = array(0,c(prjCtrl$COV, 1))
+  slopeBarCov = 25*diag(prjCtrl$COV)
+  
+  mle_start_iterations = round(.5*(prjCtrl$startBurnin + prjCtrl$startSample))
+  for(n in 1:mle_start_iterations){
+    if(prjCtrl$useConstraints){
+      #TODO: Implement aggregate logit with constraints
+    }else{
+      genLogit = genAggLogit(tData,prjCtrl,tSlopeBar,slopeBarBar,slopeBarCov)
+      tSlopeBar = genLogit[[1]]
+      prjCtrl$aRate = genLogit[[2]]
+      
+      if(n > prjCtrl$startBurnin){
+        ssTSlopeBar = ssTSlopeBar + tSlopeBar
+      }
+    }
+  }
+  
+  ssTSlopeBar = ssTSlopeBar / prjCtrl$startSample
+  
+  # Create invidual slope estimates, using aggregate mean
   
   
   
   return(param)
 }
+##### Get starting values by simulating from priors #####
 
+priorHRLStart = function(prjCtrl,param,prior){
+  #[1] "slope"         "slopeOverSig2" "slopeBar"      "slopeCov1"    
+  #[5] "slopeCov2"     "sig2"          "nS"            "s"            
+  #[9] "p"             "N"             "indHitRate"    "indLL"        
+  #[13] "TNPARAM"       "sSTNREP"       "slopeCov"      "delta"
+  
+  # Simulate beta bar
+  param$slopeBar[,1] = rmvnorm(n=1,mean = prior$slopeBarBar,sigma = solve(prior$invSlopeBarCov))
+  
+  # Simulate Slope Covariance - assume independence, each sig2_j is inv gamma(1,1)
+  tSlopeCov = diag(prjCtrl$COV)
+  for(p in 1:prjCtrl$COV){
+    tSlopeCov[p,p] = tSlopeCov[p,p]*rinvgamma(1,shape=prior$sig2Shape,scale=prior$sig2Scale)
+  }
+  param$slopeCov = tSlopeCov
+  
+  
+  for(j in 2:prjCtrl$nS){
+    # Simulate delta
+    param$delta[,j] = rmvnorm(n=1,mean = prior$delta,sigma = solve(prior$invDeltaCov))
+    # simulate sig2 (called lambda in paper)
+    param$sig2[j] = rinvgamma(n=1,shape=prior$sig2GammaShape,rate=prior$sig2GammaScale)
+  }
+  
+  for(i in 1:prjCtrl$IND){
+    
+    param$slope[,,i] = rmvnorm(n=1,mean=param$slopeBar,sigma=param$slopeCov)
+    param$s[i,1] = loadedDie(rep(1,prjCtrl$nS)/prjCtrl$nS)
+    param$slopeOverSig2[,,i] = param$slope[,,i] / param$sig2[param$s[i,1]]
+    
+  }
+  
+  for(s in 1:prjCtrl$nS){
+    param$nS[s,1] = length(param$s[param$s == s])
+  }
+  
+  return(param)
+}
 
 
 

@@ -20,25 +20,25 @@ prjCtrl = list(
     
   debug = TRUE,
   detailThin = 10,
-  printToScreenThing = 10,
+  printToScreenThin = 10,
   printFigures = TRUE,
     
   PROD = 5,
-  IND = 100,
+  IND = 10,
   COV = 8,
   demoCOV = 10,
-  nRep = 100,
+  nRep = 10,
   ridgeRegression = .1,
   fullCovar = FALSE,
   saveIndividualDraws = TRUE,
-  useConstraints = TRUE,
+  useConstraints = FALSE,
   useExistingIndSlope = FALSE,
   saveRData = TRUE,
   
   startBurnin = 1000,
   startSample = 1000,
   
-  rwParamProb = c(.55,.25,.1),
+  rwParamProb = c(.55,.35,.1),
   rwParamRwSig = c(.1,.65,1.15),
   aRate =  matrix(0,3,2),
   nS = 4, # Number of mixture components

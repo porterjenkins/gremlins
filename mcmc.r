@@ -1,4 +1,5 @@
 library(mvtnorm)
+library(invgamma)
 
 source("prjCtrl.r")
 source("mcmcUtils.R")
@@ -79,31 +80,54 @@ if(prjCtrl$useConstraints && prjCtrl$genData == FALSE){
 }
 
 if(prjCtrl$randomStart){
-  if(prjCtrl$debug && prjCtrl$genData){
-   
-    paramTrue = param 
-    
-  }
-  
-  param = mleHRLStart(prjCtrl,data,param,prior)
-
+  print("Initializing parameters at random values...")
+  # TODO: Implement John's MLE initialization routine
+  #param = mleHRLStart(prjCtrl,data,param,prior)
+  param = priorHRLStart(prjCtrl,param,prior)
   
 }else{
   # No random parameter start
+  if(prjCtrl$genData){
+    print("Initializing parameters at true values...")
+    paramTrue = param 
+  }else{
+    
+  stop("genData = FALSE, randomStart = FALSE - TODO: write code to read in true values from file")
+    
+  }
 }
-
-
-  
   
 print("Parameter start complete...")  
 print(Sys.time() - param_init_start)
   
 
 
-
 # BEGIN MCMC ROUTINE
 mcmc_start_time = Sys.time()
 print("Starting MCMC...")
+
+for(n in 1:prjCtrl$nBurnin+prjCtrl$nSample){
+  if(n %% prjCtrl$printToScreenThin == 0){
+    print(paste("iteration:",n))
+    #param$indLL = calcIndLogLike()
+    #param$cLogLike[1] =
+    #param$cLogLike[2] =
+    #param$cLogLikeS =
+    
+    tSlopeBars = array(0,dim=c(prjCtrl$COV,prjCtrl$nS))
+    for(i in 1:prjCtrl$IND){
+      tSlopeBars[,param$s[i,1]] = tSlopeBars[,param$s[i,1]] + param$slope[,,i]
+    }
+    
+    for(s in 1:prjCtrl$nS){
+      tSlopeBars[,s] = tSlopeBars[,s] / param$nS[s,1]
+    }
+    
+    
+
+    
+  }
+}
 
   
   
