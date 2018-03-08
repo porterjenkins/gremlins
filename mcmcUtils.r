@@ -32,7 +32,7 @@ sliceUp = function(xc,mu,sig2,lb){
 
 
 ##### Initialize Prior Data Structure #####
-setHRLPrior = function(COV,demoCOV){
+setHRLPrior = function(prjCtrl){
   # Create data structure for prior hyperparameters
 
   # :param COV: (int) Number of covariates in choice model
@@ -43,12 +43,12 @@ setHRLPrior = function(COV,demoCOV){
 
   prior = list(
   
-    slopeBarBar = array(0,dim=c(COV,1)),
-    invSlopeBarCov = solve(100*diag(COV)),
+    slopeBarBar = array(0,dim=c(prjCtrl$COV,1)),
+    invSlopeBarCov = solve(100*diag(prjCtrl$COV)),
     
     
-    delta =  array(0,dim=c(demoCOV,1)),
-    invDeltaCov = solve(100*diag(demoCOV)),
+    delta =  array(0,dim=c(prjCtrl$demoCOV,1)),
+    invDeltaCov = solve(100*diag(prjCtrl$demoCOV)),
     
     slopeCovScale = 1,
     slopeCovShape = 1,
@@ -105,6 +105,7 @@ setHRLParams = function(COV,IND,nS,useConstraints){
     nS = array(0,dim=c(nS,2)),
     s = array(0,dim=c(IND,nS)),
     p = array(0,dim=c(IND,nS)),
+    phi = array(0,dim=c(IND,nS)),
     N = 0,
     
     indHitRate = array(0,dim=c(IND,1)),
@@ -352,7 +353,7 @@ mnlLogLike = function(Y,X,beta,NREP,prjCtrl){
   probs = array(0,dim=c(NREP,prjCtrl$PROD))
   
   for(j in 1:prjCtrl$PROD){
-    probs[,j] = X[,,j] %*% beta
+    probs[,j] = t(X[j,,]) %*% beta
   }
   maxProb = array(0,dim=c(NREP,1))
   
@@ -367,8 +368,8 @@ mnlLogLike = function(Y,X,beta,NREP,prjCtrl){
   log_like = 0
   for(n in 1:NREP){
     for(j in 1:prjCtrl$PROD){
-      y_ij_idx = Y[n]
-      if(y_ij_idx == j){
+      y_icj_idx = Y[n]
+      if(y_icj_idx == j){
         y = 1
       }else{
         y = 0
@@ -381,6 +382,26 @@ mnlLogLike = function(Y,X,beta,NREP,prjCtrl){
   
   
   return(log_like)
+}
+
+##### Compute log likelihood of multinomial logit for state probabilities #####
+
+mnlLogLikeState = function(stateVector, dataZ, delta, prjCtrl){
+  probs = array(0,c(prjCtrl$IND,prjCtrl$nS))
+  logLike = 0
+  eta = dataZ %*% delta
+  
+  for(i in 1:prjCtrl$IND){
+    max_i = max(eta[i,])
+    eta_i = eta[i,] - max_i
+    probs[i,] = eta_i - log(sum(exp(eta_i)))
+    
+    s_i = stateVector[i]
+    logLike = logLike + probs[i,s_i] 
+    
+  }
+  
+  return(logLike)
 }
 
 
@@ -445,9 +466,9 @@ mleHRLStart = function(prjCtrl,data,param,prior){
     if(prjCtrl$useConstraints){
       #TODO: Implement aggregate logit with constraints
     }else{
-      genLogit = genAggLogit(tData,prjCtrl,tSlopeBar,slopeBarBar,slopeBarCov)
-      tSlopeBar = genLogit[[1]]
-      prjCtrl$aRate = genLogit[[2]]
+        genLogit = genAggLogit(tData,prjCtrl,tSlopeBar,slopeBarBar,slopeBarCov)
+        tSlopeBar = genLogit[[1]]
+        prjCtrl$aRate = genLogit[[2]]
       
       if(n > prjCtrl$startBurnin){
         ssTSlopeBar = ssTSlopeBar + tSlopeBar
@@ -501,9 +522,190 @@ priorHRLStart = function(prjCtrl,param,prior){
     param$nS[s,1] = length(param$s[param$s == s])
   }
   
+  param$phi = array(1/prjCtrl$nS,dim=c(prjCtrl$IND,prjCtrl$nS))
+  
   return(param)
 }
 
+##### Generate beta (constrained) from full conditional #####
+genHRLSlopeConstraint = function(dataY,dataTNREP,dataX,prjCtrl,sig2,slope,slopeBar,slopeCov,slopeConstraint){
+  jump_size_index = loadedDie(prjCtrl$rwParamProb)
+  slope = slope*(1/sig2)
+  rw_sig = prjCtrl$rwParamRwSig[jump_size_index]
+  
+  t_lap = 0
+  
+  p_slope = array(0,dim=c(prjCtrl$COV,1))
+  for(j in 1:prjCtrl$COV){
+    p_slope[j,1] = rnorm(n=1,mean=slope[j],sd=rw_sig)
+    if(slopeConstraint[j,1] != 0){
+      if(slopeConstraint[j,1] == 1){
+        i = 0
+        while(p_slope[j,1]<0 && i<100){
+          p_slope[j,1] = rnorm(n=1,mean=slope[j],sd=rw_sig)
+          i = i + 1
+        }
+        if(i == 99){
+          p_slope[j,1] = slope[j]
+        }else{
+          t_lap = t_lap + log(1-pnorm(-slope[j]/rw_sig)) - log(1-pnorm(-p_slope[j,1]/rw_sig))
+          }
+      }else{
+        i = 0
+        while(p_slope[j,1]>0 && i<100){
+          p_slope[j,1] = rnorm(n=1,mean=slope[j],sd=rw_sig)
+          i = i + 1
+        }
+        if(i == 99){
+          p_slope[j,1] = slope[j]
+        }else{
+          t_lap = t_lap + log(1-pnorm(-slope[j]/rw_sig)) - log(1-pnorm(-p_slope[j,1]/rw_sig))
+        }
+      }
+    }
+  }
+  
+  cLL = mnlLogLike(dataY,dataX,slope,dataTNREP,prjCtrl)
+  pLL = mnlLogLike(dataY,dataX,p_slope,dataTNREP,prjCtrl)
+  
+  cPrior = -0.5*t(slope-slopeBar)%*%solve(slopeCov)%*%(slope-slopeBar)
+  pPrior = -0.5*t(slope-slopeBar)%*%solve(slopeCov)%*%(slope-slopeBar)
+  
+  lap = pLL + pPrior - cLL - cPrior
+  
+  a_rate = prjCtrl$aRate
+  alpha = log(runif(1))
+  if(alpha < lap){
+    slope = p_slope
+    a_rate[jump_size_index,1] = a_rate[jump_size_index,1] + 1
+    
+  }
+  
+  slope = slope*sig2
+  a_rate[jump_size_index,2] = a_rate[jump_size_index,2] + 1
+  
+  return(list(slope,a_rate))
+}
 
+##### Generate beta (unconstrained) from full conditional #####
+genHRLSlope = function(dataY,dataTNREP,dataX,prjCtrl,sig2,slope,slopeBar,slopeCov){
+  jump_size_index = loadedDie(prjCtrl$rwParamProb)
+  slope = slope*(1/sig2)
+  rw_sig = prjCtrl$rwParamRwSig[jump_size_index]
+  p_slope = t(rmvnorm(n=1,mean=slope,sigma = rw_sig*diag(prjCtrl$COV)))
+  
+  cLL = mnlLogLike(dataY,dataX,slope,dataTNREP,prjCtrl)
+  pLL = mnlLogLike(dataY,dataX,p_slope,dataTNREP,prjCtrl)
+  
+  cPrior = -0.5*t(slope-slopeBar)%*%solve(slopeCov)%*%(slope-slopeBar)
+  pPrior = -0.5*t(slope-slopeBar)%*%solve(slopeCov)%*%(slope-slopeBar)
+  
+  lap = pLL + pPrior - cLL - cPrior
+  
+  a_rate = prjCtrl$aRate
+  alpha = log(runif(1))
+  if(alpha < lap){
+    slope = p_slope
+    a_rate[jump_size_index,1] = a_rate[jump_size_index,1] + 1
+    
+  }
+  
+  slope = slope*sig2
+  a_rate[jump_size_index,2] = a_rate[jump_size_index,2] + 1
+  return(list(slope,a_rate))
+  
+}
+
+
+genHRLSlopeBar = function(prjCtrl,param,prior){
+  sum_slope_i = param$slope[,,1]
+  for(i in 1:prjCtrl$IND){
+    sum_slope_i = sum_slope_i + param$slope[,,i]
+  }
+  
+  slope_inv_cov = solve(param$slopeCov)
+  n = prjCtrl$IND
+  
+  covariance_mtx = solve(n*slope_inv_cov + prior$invSlopeBarCov)
+  mean = slope_inv_cov %*% sum_slope_i + prior$invSlopeBarCov %*% prior$slopeBarBar
+  mean = covariance_mtx %*% mean
+  
+  gen_slope_bar = t(rmvnorm(n=1,mean=mean,sigma=covariance_mtx))
+  return(gen_slope_bar)
+}
+
+
+genHRLSlopeCov = function(prjCtrl,param,prior){
+  slopeCov = array(0,dim=c(prjCtrl$COV,prjCtrl$COV))
+  scale = (param$slope[,,1] - param$slopeBar)**2
+  shape = prior$slopeCovShape + .5*prjCtrl$IND
+  
+  for(i in 2:prjCtrl$IND){
+    scale = scale + (param$slope[,,i] - param$slopeBar)**2
+  }
+  scale = array(prior$slopeCovScale,dim=c(prjCtrl$COV,1)) + .5*scale
+  
+  for(j in 1:prjCtrl$COV){
+    slopeCov[j,j] = 1/rgamma(n=1,shape=shape,scale=1/scale[j])
+  }
+  return(slopeCov)
+}
+
+
+genHRLDelta = function(stateVector,dataZ,prjCtrl,delta,prior){
+  jump_size_index = loadedDie(prjCtrl$rwParamProbDelta)
+  rw_sig = prjCtrl$rwParamRwSigDelta[jump_size_index]
+  a_rate = prjCtrl$deltaARate
+  p_delta = delta
+  for(s in 2:prjCtrl$nS){
+    p_delta[,s] = rmvnorm(n=1,mean=delta[,s],sigma = rw_sig*diag(prjCtrl$demoCOV))
+  
+  
+    cLL = mnlLogLikeState(stateVector,dataZ,delta,prjCtrl) 
+    pLL = mnlLogLikeState(stateVector,dataZ,p_delta,prjCtrl) 
+    
+  
+    cPrior =  -0.5*t(delta[,s]-prior$delta)%*%prior$invDeltaCov%*%(delta[,s]-prior$delta)
+    pPrior =  -0.5*t(p_delta[,s]-prior$delta)%*%prior$invDeltaCov%*%(p_delta[,s]-prior$delta)
+  
+    lap = pLL + pPrior - cLL - cPrior
+    
+    alpha = log(runif(1))
+    if(alpha < lap){
+      delta[,s] = p_delta[,s]
+      a_rate[jump_size_index,1] = a_rate[jump_size_index,1] + 1
+      
+    }
+    
+    a_rate[jump_size_index,2] = a_rate[jump_size_index,2] + 1
+  }
+  return(list(delta,a_rate))
+  
+}
+
+
+genHRLPhi = function(dataZ,delta){
+  probs = array(0,c(prjCtrl$IND,prjCtrl$nS))
+  eta = dataZ %*% delta
+  
+  for(i in 1:prjCtrl$IND){
+    max_i = max(eta[i,])
+    eta_i = eta[i,] - max_i
+    probs[i,] = exp(eta_i)/sum(exp(eta_i))
+  }
+  
+  return(probs)
+}
+
+
+genHRLSig2 = function(prjCtrl,data,param){
+  sig2 = param$sig2
+  for(k in 2:prjCtrl$nS){
+    
+  }
+  
+  
+  return(sig2)
+}
 
 

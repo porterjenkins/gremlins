@@ -24,7 +24,7 @@ prjCtrl = list(
   printFigures = TRUE,
     
   PROD = 5,
-  IND = 10,
+  IND = 20,
   COV = 8,
   demoCOV = 10,
   nRep = 10,

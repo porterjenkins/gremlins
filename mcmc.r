@@ -10,7 +10,7 @@ main = function(){
   
   # Set Parameters
   # Hyper parameters
-  prior = setHRLPrior(COV=prjCtrl$COV,demoCOV=prjCtrl$demoCOV)
+  prior = setHRLPrior(prjCtrl)
   paramSS = setHRLSS(prjCtrl$COV,prjCtrl$IND,prjCtrl$nS)
   param = setHRLParams(prjCtrl$COV,prjCtrl$IND,prjCtrl$nS,prjCtrl$useConstraints)
     
@@ -123,8 +123,52 @@ for(n in 1:prjCtrl$nBurnin+prjCtrl$nSample){
       tSlopeBars[,s] = tSlopeBars[,s] / param$nS[s,1]
     }
     
+    for(i in 1:prjCtrl$IND){
+      if(prjCtrl$useConstraints){
+        # TODO: implement genHRLSlopeConstraint
+        genSlope = genHRLSlopeConstraint(dataY=data$y[,,i],
+                                         dataTNREP=prjCtrl$nRep,
+                                         dataX=data$X[,,,i],
+                                         prjCtrl=prjCtrl,
+                                         sig2=param$sig2[param$s[i,1]],
+                                         slope=param$slope[,,i],
+                                         slopeBar=param$slopeBar,
+                                         slopeCov=param$slopeCov,
+                                         slopeConstraint=param$slopeConstraintFlag)
+      }else{
+        genSlope = genHRLSlope(dataY=data$y[,,i],
+                               dataTNREP=prjCtrl$nRep,
+                               dataX=data$X[,,,i],
+                               prjCtrl=prjCtrl,
+                               sig2=param$sig2[param$s[i,1]],
+                               slope=param$slope[,,i],
+                               slopeBar=param$slopeBar,
+                               slopeCov=param$slopeCov)
+        
+      }
+      param$slope[,,i] = genSlope[[1]]
+      prjCtrl$aRate = genSlope[[2]]
+    }
     
-
+    #generate slope bar
+    param$slopeBar = genHRLSlopeBar(prjCtrl,param,prior)
+    # generate slope covariance
+    param$slopeCov = genHRLSlopeCov(prjCtrl,param,prior)
+    # generate delta
+    genDelta = genHRLDelta(stateVector=param$s,dataZ=data$Z,prjCtrl=prjCtrl,delta=param$delta,prior=prior)
+    param$delta = genDelta[[1]]
+    prjCtrl$deltaARate = genDelta[[2]]
+    #generate phi
+    param$phi = genHRLPhi(data$Z,param$delta)
+    #generate sig2
+    if(runif(1) < prjCtrl$probGenSig2){
+      param$sig2 = genHRLSig2(prjCtrl,data,param)
+    }
+    #generate s
+    
+    #count nS
+    
+    #end
     
   }
 }
