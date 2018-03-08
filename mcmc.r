@@ -122,7 +122,7 @@ for(n in 1:prjCtrl$nBurnin+prjCtrl$nSample){
     for(s in 1:prjCtrl$nS){
       tSlopeBars[,s] = tSlopeBars[,s] / param$nS[s,1]
     }
-    
+  }
     for(i in 1:prjCtrl$IND){
       if(prjCtrl$useConstraints){
         # TODO: implement genHRLSlopeConstraint
@@ -165,19 +165,23 @@ for(n in 1:prjCtrl$nBurnin+prjCtrl$nSample){
       param$sig2 = genHRLSig2(prjCtrl,data,param)
     }
     #generate s
+    param$s = genHRLS(prjCtrl,data,param)
     
     #count nS
-    
+    for(k in 1:prjCtrl$nS){
+      param$nS[k,1] = length(param$s[param$s == k])
+    }
     #end
     
-  }
+  
 }
 
-  
-  
 
 
 
+if(prjCtrl$saveRData){
+  save(param,file=prjCtrl$paramFile)
+}
 print("MCMC complete")
 print(Sys.time() - mcmc_start_time)
 }

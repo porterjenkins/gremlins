@@ -507,7 +507,7 @@ priorHRLStart = function(prjCtrl,param,prior){
     # Simulate delta
     param$delta[,j] = rmvnorm(n=1,mean = prior$delta,sigma = solve(prior$invDeltaCov))
     # simulate sig2 (called lambda in paper)
-    param$sig2[j] = rinvgamma(n=1,shape=prior$sig2GammaShape,rate=prior$sig2GammaScale)
+    param$sig2[j] = max(param$sig2[j-1]*1.5,rinvgamma(n=1,shape=prior$sig2GammaShape,rate=prior$sig2GammaScale))
   }
   
   for(i in 1:prjCtrl$IND){
@@ -701,11 +701,78 @@ genHRLPhi = function(dataZ,delta){
 genHRLSig2 = function(prjCtrl,data,param){
   sig2 = param$sig2
   for(k in 2:prjCtrl$nS){
+    if(k < prjCtrl$nS){
+      pSig2 = sig2[k] + ((sig2[k+1]-sig2[k-1])/6)*runif(1)
+      while(pSig2 < sig2[k-1] || pSig2 > sig2[k+1]){
+        pSig2 = sig2[k] + ((sig2[k+1]-sig2[k-1])/6)*runif(1)
+      }
+    }else{
+      pSig2 = sig2[k] + ((sig2[k]-sig2[1])/(6*prjCtrl$nS))*runif(1)
+      while(pSig2 < sig2[k-1]){
+        pSig2 = sig2[k] + ((sig2[k]-sig2[1])/(6*prjCtrl$nS))*runif(1)
+      }
+    }
+  
+  
+    cIndLL = array(0,dim=c(prjCtrl$IND,1))
+    pIndLL = array(0,dim=c(prjCtrl$IND,1))
+    cIndPrior = array(0,dim=c(prjCtrl$IND,1))
+    pIndPrior = array(0,dim=c(prjCtrl$IND,1))
+    
+    for(i in 1:prjCtrl$IND){
+      if(param$s[i,1] == k){
+        cSlope = (1/sig2[k])*param$slope[,,i]
+        pSlope = (1/pSig2)*param$slope[,,i]
+        
+        cIndLL[i,1] = mnlLogLike(data$y[,,i],data$X[,,,i],cSlope,prjCtrl$nRep,prjCtrl)
+        pIndLL[i,1] = mnlLogLike(data$y[,,i],data$X[,,,i],pSlope,prjCtrl$nRep,prjCtrl)
+        
+        cIndPrior[i,1] = -0.5*t(param$slope[,,i]-param$slopeBar)%*%solve(param$slopeCov)%*%(param$slope[,,i]-param$slopeBar)
+        cIndPrior[i,1] = cIndPrior[i,1] + 2.5*k*(param$nS[k]/prjCtrl$IND)*log(sig2[k]) - sig2[k]/100
+        
+        pIndPrior[i,1] = -0.5*t(pSig2*pSlope-param$slopeBar)%*%solve(param$slopeCov)%*%(pSig2*pSlope-param$slopeBar)
+        pIndPrior[i,1] = pIndPrior[i,1] + 2.5*k*(param$nS[k]/prjCtrl$IND)*log(pSig2) - pSig2/100
+        
+      }
+    }
+    cLL = sum(cIndLL)
+    pLL = sum(pIndLL)
+    cPrior = sum(cIndPrior)
+    pPrior = sum(pIndPrior)
+    
+    lap = pLL + pPrior - cLL - cPrior
+    alpha = log(runif(1))
+    if(alpha < lap){
+      sig2[k] = pSig2
+    }
     
   }
-  
-  
   return(sig2)
 }
 
+
+genHRLS = function(prjCtrl,data,param){
+  s = array(0,dim=c(prjCtrl$IND,1))
+  phi = param$phi
+  
+  for(i in 1:prjCtrl$IND){
+    prob = array(0,prjCtrl$nS)
+    diffSlope = param$slope[,,i] - param$slopeBar
+    ssSlope = t(diffSlope)%*%solve(param$slopeCov)%*%diffSlope
+    
+    for(k in 1:prjCtrl$nS){
+      cSlope = (1/param$sig2[k])*param$slope[,,i]
+      prob[k] = mnlLogLike(data$y[,,i],data$X[,,,i],cSlope,prjCtrl$nRep,prjCtrl)
+      prob[k] = prob[k] -.5*ssSlope + log(phi[i,k])
+    }
+    maxProb = max(prob)
+    prob = exp(prob - maxProb)
+    prob = prob/sum(prob)
+    s[i,1] = loadedDie(prob)
+    
+  }
+
+  
+  return(s)
+}
 

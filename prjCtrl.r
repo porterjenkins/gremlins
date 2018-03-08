@@ -24,10 +24,10 @@ prjCtrl = list(
   printFigures = TRUE,
     
   PROD = 5,
-  IND = 20,
+  IND = 100,
   COV = 8,
   demoCOV = 10,
-  nRep = 10,
+  nRep = 25,
   ridgeRegression = .1,
   fullCovar = FALSE,
   saveIndividualDraws = TRUE,
@@ -71,7 +71,7 @@ prjCtrl[["indSlopeFile"]] = paste(prjCtrl$projectName,"indSlopeFile.csv",sep = "
 prjCtrl[["detailFile"]] = paste(prjCtrl$projectName,"HRLdetail.txt",sep = "")
 prjCtrl[["logLikeFile"]] = paste(prjCtrl$projectName,"HRLLogLike.txt",sep = "")
 prjCtrl[["reportFile"]] = paste(prjCtrl$projectName,"HRLreport.txt",sep = "")
-prjCtrl[["paramFile"]] = paste(prjCtrl$projectName,"tmp_demo.RData",sep = "") # Save as R Data object
+prjCtrl[["paramFile"]] = paste(prjCtrl$projectName,"HRLparam.RData",sep = "") # Save as R Data object
 prjCtrl[["paramPostMeanFile"]] = paste(prjCtrl$projectName,"HRLparamPostMean.RData",sep = "") # Save as R Data object
 prjCtrl[["paramSSFile"]] = paste(prjCtrl$projectName,"HRLparamSS.RData",sep = "") # Save as R data object
 prjCtrl[["trueParamFile"]] = paste(prjCtrl$projectName,"HRLTrueParam.RData",sep = "")
