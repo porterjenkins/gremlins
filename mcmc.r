@@ -106,7 +106,7 @@ print(Sys.time() - param_init_start)
 mcmc_start_time = Sys.time()
 print("Starting MCMC...")
 
-for(n in 1:prjCtrl$nBurnin+prjCtrl$nSample){
+for(n in 1:(prjCtrl$nBurnin+prjCtrl$nSample)){
   if(n %% prjCtrl$printToScreenThin == 0){
     print(paste("iteration:",n))
     #param$indLL = calcIndLogLike()
@@ -125,7 +125,6 @@ for(n in 1:prjCtrl$nBurnin+prjCtrl$nSample){
   }
     for(i in 1:prjCtrl$IND){
       if(prjCtrl$useConstraints){
-        # TODO: implement genHRLSlopeConstraint
         genSlope = genHRLSlopeConstraint(dataY=data$y[,,i],
                                          dataTNREP=prjCtrl$nRep,
                                          dataX=data$X[,,,i],

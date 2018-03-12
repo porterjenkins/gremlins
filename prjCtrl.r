@@ -8,8 +8,8 @@ prjCtrl = list(
   runDelta = TRUE,
     
     
-  nBurnin = 1000,
-  nSample = 1000,
+  nBurnin = 10000,
+  nSample = 10000,
   useTrueParam = TRUE,
   randomStart = TRUE,
   genData = TRUE,
