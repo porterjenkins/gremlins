@@ -12,7 +12,8 @@ main = function(){
   # Hyper parameters
   prior = setHRLPrior(prjCtrl)
   paramSS = setHRLSS(prjCtrl$COV,prjCtrl$IND,prjCtrl$nS)
-  param = setHRLParams(prjCtrl$COV,prjCtrl$IND,prjCtrl$nS,prjCtrl$useConstraints)
+  param = setHRLParams(prjCtrl)
+  paramDraws = initParamDraws(prjCtrl)
     
   if(prjCtrl$genData){
   
@@ -35,10 +36,16 @@ main = function(){
         dataZ = NULL
       }
   
-      param = genHRLParams(prjCtrl = prjCtrl,
+      trueParam = genHRLParams(prjCtrl = prjCtrl,
                           param = param,
                           dataZ = dataZ,
                           prior = prior)
+      if(prjCtrl$saveRData){
+        save(trueParam,file=prjCtrl$trueParamFile)
+      }
+      
+      param = trueParam
+      
       if(prjCtrl$useConstraints){
         paramSS$slopeConstraintFlag = param$slopeConstraintFlag
         write.table(param$slopeConstraintFlag,file=prjCtrl$paramConstraintsFile,col.names = FALSE,row.names=FALSE)
@@ -107,7 +114,7 @@ mcmc_start_time = Sys.time()
 print("Starting MCMC...")
 
 for(n in 1:(prjCtrl$nBurnin+prjCtrl$nSample)){
-  if(n %% prjCtrl$printToScreenThin == 0){
+  if(n %% prjCtrl$thin == 0){
     print(paste("iteration:",n))
     #param$indLL = calcIndLogLike()
     #param$cLogLike[1] =
@@ -123,6 +130,7 @@ for(n in 1:(prjCtrl$nBurnin+prjCtrl$nSample)){
       tSlopeBars[,s] = tSlopeBars[,s] / param$nS[s,1]
     }
   }
+  
     for(i in 1:prjCtrl$IND){
       if(prjCtrl$useConstraints){
         genSlope = genHRLSlopeConstraint(dataY=data$y[,,i],
@@ -170,24 +178,34 @@ for(n in 1:(prjCtrl$nBurnin+prjCtrl$nSample)){
     for(k in 1:prjCtrl$nS){
       param$nS[k,1] = length(param$s[param$s == k])
     }
-    #end
+    
+    # Save param draws if past burn-in
+    if((n > prjCtrl$nBurnin) && (n %% prjCtrl$thin == 0)){
+      paramDraws = saveCurrentDraw(paramDraws,param,n,prjCtrl)
+    }
     
   
 }
 
 
 
-
 if(prjCtrl$saveRData){
-  save(param,file=prjCtrl$paramFile)
+  save(paramDraws,file=prjCtrl$paramFile)
 }
 print("MCMC complete")
 print(Sys.time() - mcmc_start_time)
+
+if(prjCtrl$saveRData){
+  save(paramDraws,file=prjCtrl$paramDrawsFile)
 }
 
+#return(paramDraws)
 
-
+}
 
 ## Execute main MCMC routine
 main()
+
+
+
 

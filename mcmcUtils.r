@@ -91,39 +91,85 @@ setHRLSS = function(COV,IND,nS){
 
 ##### Initialize Parameter Data Structure #####
 
-setHRLParams = function(COV,IND,nS,useConstraints){
+setHRLParams = function(prjCtrl){
   
   param = list(
     
-    slope = array(0, dim=c(COV,1,IND)),
-    slopeOverSig2 = array(0, dim=c(COV,1,IND)),
+    slope = array(0, dim=c(prjCtrl$COV,1,prjCtrl$IND)),
+    slopeOverSig2 = array(0, dim=c(prjCtrl$COV,1,prjCtrl$IND)),
     
-    slopeBar = array(0,dim=c(COV,1)),
-    slopeCov1 = array(0,dim=COV),
-    slopeCov2 = array(0,dim=COV),
-    sig2 = array(0,dim=c(2,1,nS)),
-    nS = array(0,dim=c(nS,2)),
-    s = array(0,dim=c(IND,nS)),
-    p = array(0,dim=c(IND,nS)),
-    phi = array(0,dim=c(IND,nS)),
+    slopeBar = array(0,dim=c(prjCtrl$COV,1)),
+    slopeCov = array(0,dim=c(prjCtrl$COV,prjCtrl$COV)),
+    sig2 = array(0,dim=c(2,1,prjCtrl$nS)),
+    nS = array(0,dim=c(prjCtrl$nS,2)),
+    s = array(0,dim=c(prjCtrl$IND,1)),
+    p = array(0,dim=c(prjCtrl$IND,prjCtrl$nS)),
+    phi = array(0,dim=c(prjCtrl$IND,prjCtrl$nS)),
     N = 0,
     
-    indHitRate = array(0,dim=c(IND,1)),
-    indLL =  array(0,dim=c(IND,1)),
+    indHitRate = array(0,dim=c(prjCtrl$IND,1)),
+    indLL =  array(0,dim=c(prjCtrl$IND,1)),
     
-    TNPARAM = (IND + 2) * COV + 2*nS,
-    sSTNREP =  array(0,dim=c(nS,1))
+    TNPARAM = (prjCtrl$IND + 2) * prjCtrl$COV + 2*prjCtrl$nS,
+    sSTNREP =  array(0,dim=c(prjCtrl$nS,1))
 
   )
   
-  if(useConstraints){
+  if(prjCtrl$useConstraints){
     param[["slopeConstraintFlag"]] = array(0,dim=c(COV,1))
   }
-  
+  if(prjCtrl$runDelta){
+    param[["delta"]] = array(0,dim=c(prjCtrl$demoCOV,prjCtrl$nS))
+  }
+
   return(param)
   
-  
 }
+
+##### Initialize Parameter Data Draws Structure #####
+
+initParamDraws = function(prjCtrl){
+  
+  if(prjCtrl$nSample %% prjCtrl$thin == 0){
+    n_save_draws = prjCtrl$nSample / prjCtrl$thin
+  }else{
+    stop('Project control attributes, nSample must be divisible by thin')
+  }
+  
+  paramDraws = list(
+    
+    slopeBar = array(0,dim = c(prjCtrl$COV,1,n_save_draws)),
+    delta = array(0,dim = c(prjCtrl$demoCOV,prjCtrl$nS,n_save_draws)),
+    slopeCov = array(0,dim = c(prjCtrl$COV,prjCtrl$COV,n_save_draws)),
+  
+    slope = array(0,dim = c(prjCtrl$COV,1,prjCtrl$IND,n_save_draws)),
+    s = array(0,dim=c(prjCtrl$IND,1,n_save_draws)),
+    phi = array(0,dim=c(prjCtrl$IND,prjCtrl$nS,n_save_draws))
+  )
+  
+  
+  return(paramDraws)
+}
+
+##### Save current parameter draws to parameter draws object  #####
+
+saveCurrentDraw = function(paramDraws,param,n,prjCtrl){
+  
+  save_idx = (n-prjCtrl$nBurnin)/prjCtrl$thin
+  
+  paramDraws$slopeBar[,,save_idx] = param$slopeBar
+  paramDraws$delta[,,save_idx] = param$delta
+  paramDraws$slopeCov[,,save_idx] = param$slopeCov
+  
+  paramDraws$slope[,,,save_idx] = param$slope
+  paramDraws$s[,,save_idx] = param$s
+  paramDraws$phi[,,save_idx] = param$phi
+
+  
+  return(paramDraws)
+}
+
+
 
 ##### Generate True Parameter Values #####
 genHRLParams = function(prjCtrl,param,dataZ,prior){
@@ -776,3 +822,92 @@ genHRLS = function(prjCtrl,data,param){
   return(s)
 }
 
+
+stabilityTest = function(trueParam,paramDraws){
+  
+  # Cross validate slope bars
+  n_slope_bar = length(trueParam$slopeBar)
+  slope_bar_in_range = array(0,dim=n_slope_bar)
+  for(i in 1:n_slope_bar){
+    slope_true_i = trueParam$slopeBar[i]
+    slope_bar_i = paramDraws$slopeBar[i,,]
+    posterior_range = quantile(slope_bar_i,probs=c(.025,.975))
+    if((slope_true_i >= posterior_range[1]) && (slope_true_i <= posterior_range[2])){
+      slope_bar_in_range[i] = TRUE
+    }
+    else{
+      slope_bar_in_range[i] = FALSE
+    }
+  }
+  
+  print(paste("Percent Slope Bar In Range:",mean(slope_bar_in_range)))
+  
+  
+  
+  # cross validate slope i's
+  n_slope_bar = dim(trueParam$slope)[1]
+  ind = dim(trueParam$slope)[3]
+  slope_bar_in_range = array(0,dim=c(n_slope_bar,ind))
+  
+  for(i in 1:n_slope_bar){
+    for(j in 1:ind){
+      slope_true_ij = trueParam$slope[i,,j]
+      slope_ij = paramDraws$slope[i,,j,]
+      posterior_range = quantile(slope_ij,probs=c(.025,.975))
+      if((slope_true_ij >= posterior_range[1]) && (slope_true_ij <= posterior_range[2])){
+        slope_bar_in_range[i,j] = TRUE
+      }
+      else{
+        slope_bar_in_range[i,j] = FALSE
+      }
+    
+    }  
+  }
+  
+  
+  print(paste("Percent Slope i In Range:",mean(slope_bar_in_range)))
+  
+  # cross validate delta
+  n_delta = dim(trueParam$delta)[1]
+  n_s = dim(trueParam$delta)[2]
+  delta_in_range = array(0,dim=c(n_delta,n_s))
+  
+  for(i in 1:n_delta){
+    for(j in 1:n_s){
+      delta_true_ij = trueParam$delta[i,j]
+      delta_ij = paramDraws$delta[i,j,]
+      posterior_range = quantile(delta_ij,probs=c(.025,.975))
+      if((delta_true_ij >= posterior_range[1]) && (delta_true_ij <= posterior_range[2])){
+        delta_in_range[i,j] = TRUE
+      }
+      else{
+        delta_in_range[i,j] = FALSE
+      }
+      
+    }  
+  }
+  
+  print(paste("Percent Delta In Range:",mean(delta_in_range)))
+
+  # Cross validate slope covariance - diag only
+  n_slope_bar = dim(trueParam$slopeCov)[1]
+  slope_cov_in_range = array(0,dim=n_slope_bar)
+  for(i in 1:n_slope_bar){
+    slope_cov_true_i = trueParam$slopeCov[i,i]
+    slope_cov_i = paramDraws$slopeCov[i,i,]
+    posterior_range = quantile(slope_cov_i,probs=c(.025,.975))
+    #print(c(slope_cov_true_i,posterior_range))
+    if((slope_cov_true_i >= posterior_range[1]) && (slope_cov_true_i <= posterior_range[2])){
+      slope_cov_in_range[i] = TRUE
+    }
+    else{
+      slope_cov_in_range[i] = FALSE
+    }
+  }
+  
+  print(paste("Percent Slope Covariance (diag) In Range:",mean(slope_cov_in_range)))
+  print(slope_cov_in_range)
+  
+  
+  
+}

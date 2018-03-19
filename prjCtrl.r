@@ -8,8 +8,8 @@ prjCtrl = list(
   runDelta = TRUE,
     
     
-  nBurnin = 10000,
-  nSample = 10000,
+  nBurnin = 5000,
+  nSample = 5000,
   useTrueParam = TRUE,
   randomStart = TRUE,
   genData = TRUE,
@@ -19,8 +19,7 @@ prjCtrl = list(
   includeIntercept = FALSE,
     
   debug = TRUE,
-  detailThin = 10,
-  printToScreenThin = 10,
+  thin = 10,
   printFigures = TRUE,
     
   PROD = 5,
@@ -41,7 +40,7 @@ prjCtrl = list(
   rwParamProb = c(.55,.35,.1),
   rwParamRwSig = c(.1,.65,1.15),
   aRate =  matrix(0,3,2),
-  nS = 4, # Number of mixture components
+  nS = 2, # Number of mixture components
   probKMeansProposal = 0,
   probDecayKMeansProposal = .9,
   probGenS = .5,
@@ -79,6 +78,9 @@ prjCtrl[["trueParamFileTxt"]] = paste(prjCtrl$projectName,"HRLTrueParam.txt",sep
 prjCtrl[["priorFile"]] = paste(prjCtrl$projectName,"HRLPrior.RData",sep = "")
 prjCtrl[["nParamFile"]] = paste(prjCtrl$projectName,"nParam.txt",sep = "")
 prjCtrl[["indResultsFile"]] = paste(prjCtrl$projectName,"IndResults.txt",sep = "")
+
+prjCtrl[["paramDrawsFile"]] = paste(prjCtrl$projectName,"paramDraws.RData",sep = "")
+
 
 if(prjCtrl$useConstraints)
 {
