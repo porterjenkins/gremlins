@@ -1,4 +1,5 @@
 library(mvtnorm)
+library(coda)
 
 ##### "Roll" Loaded Die #####
 
@@ -906,8 +907,46 @@ stabilityTest = function(trueParam,paramDraws){
   }
   
   print(paste("Percent Slope Covariance (diag) In Range:",mean(slope_cov_in_range)))
-  print(slope_cov_in_range)
   
   
+}
+
+plotConvergenceDelta = function(paramDraws){
+  n_s = dim(paramDraws$delta)[2]
+  for(s in 2:n_s){
+    delta = mcmc(t(paramDraws$delta[,s,]))
+    plot(delta,main=paste("Segment",s))
+    
+  }
+}
+
+plotConvergenceSlopeBar = function(paramDraws){
+  slope_bar = mcmc(t(paramDraws$slopeBar[,1,]))
+  plot(slope_bar)
+  
+}
+
+plotConvergenceSlope = function(paramDraws){
+  ind = dim(paramDraws$slope)[3]
+  for(i in 1:ind){
+    slope =  mcmc(t(paramDraws$slope[,1,i,]))
+    plot(slope,main=paste("ind",i))
+  }
+  
+}
+
+plotConvergenceSlopeCovDiag = function(paramDraws){
+  n_sample = dim(paramDraws$slopeCov)[3]
+  n_slope_bar = dim(paramDraws$slopeCov)[2]
+  cov_diag = array(0,dim=c(n_sample,n_slope_bar))
+  
+  for(i in 1:n_sample){
+    for(j in 1:n_slope_bar){
+      cov_diag[i,j] = paramDraws$slopeCov[j,j,i]
+    }
+  }
+  
+  cov_diag = mcmc(cov_diag)
+  plot(cov_diag)
   
 }
